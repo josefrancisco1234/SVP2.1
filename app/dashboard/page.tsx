@@ -1,12 +1,17 @@
 import { redirect } from "next/navigation"
-import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 
 export default async function DashboardPage() {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createClient()
 
-  const { data: { user }, error } = await supabase.auth.getUser()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
 
-  if (error || !user) redirect("/auth/login")
+  if (error || !user) {
+    redirect("/auth/login")
+  }
 
   return (
     <div className="min-h-screen">
