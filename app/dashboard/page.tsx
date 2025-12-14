@@ -1,32 +1,17 @@
-import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { ProductList } from "@/components/dashboard/product-list"
-import { StoreHeader } from "@/components/dashboard/store-header"
+import { createSupabaseServerClient } from "@/lib/supabase/server"
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
+  const supabase = createSupabaseServerClient()
 
-  const { data, error } = await supabase.auth.getUser()
-  if (error || !data?.user) {
-    redirect("/auth/login")
-  }
+  const { data: { user }, error } = await supabase.auth.getUser()
 
-  const { data: seller, error: sellerError } = await supabase
-    .from("sellers")
-    .select("*")
-    .eq("id", data.user.id)
-    .single()
-
-  if (sellerError || !seller) {
-    redirect("/auth/login")
-  }
+  if (error || !user) redirect("/auth/login")
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      <StoreHeader seller={seller} />
-      <main className="container mx-auto px-4 py-8">
-        <ProductList sellerId={data.user.id} />
-      </main>
+    <div className="min-h-screen">
+      <h1>Dashboard</h1>
+      <p>Logged in as: {user.email}</p>
     </div>
   )
 }
