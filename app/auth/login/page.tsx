@@ -58,6 +58,8 @@ export default function LoginPage() {
 
       console.log("[v0] Redirecting to dashboard")
       router.push("/dashboard")
+      router.refresh()
+
     } catch (error: unknown) {
       clearTimeout(0)
       const errorMsg = error instanceof Error ? error.message : "An error occurred during login. Please try again."
