@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -18,12 +17,14 @@ interface ProductFormProps {
 export function ProductForm({ sellerId, onSuccess }: ProductFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     price: "",
     category: "general",
-    image_url: "",
     in_stock: true,
   })
 
@@ -38,6 +39,39 @@ export function ProductForm({ sellerId, onSuccess }: ProductFormProps) {
     setFormData((prev) => ({ ...prev, category: value }))
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null
+    setFile(f)
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setPreviewUrl(f ? URL.createObjectURL(f) : null)
+  }
+
+  const uploadProductImage = async (imageFile: File) => {
+    // valida tipo
+    if (!imageFile.type.startsWith("image/")) {
+      throw new Error("El archivo debe ser una imagen.")
+    }
+
+    // nombre único (por seller)
+    const ext = imageFile.name.split(".").pop() || "jpg"
+    const filePath = `${sellerId}/${crypto.randomUUID()}.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from("product-images")
+      .upload(filePath, imageFile, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: imageFile.type,
+      })
+
+    if (uploadError) throw uploadError
+
+    // si el bucket es PUBLIC:
+    const { data } = supabase.storage.from("product-images").getPublicUrl(filePath)
+    return data.publicUrl
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -49,26 +83,34 @@ export function ProductForm({ sellerId, onSuccess }: ProductFormProps) {
         throw new Error("Price must be a valid positive number")
       }
 
+      let imageUrl: string | null = null
+      if (file) {
+        imageUrl = await uploadProductImage(file)
+      }
+
       const { error: insertError } = await supabase.from("products").insert({
         seller_id: sellerId,
         name: formData.name,
         description: formData.description || null,
-        price: price,
+        price,
         category: formData.category,
-        image_url: formData.image_url || null,
+        image_url: imageUrl, // <-- aquí guardas la URL del storage
         in_stock: formData.in_stock,
       })
 
       if (insertError) throw insertError
 
+      // reset
       setFormData({
         name: "",
         description: "",
         price: "",
         category: "general",
-        image_url: "",
         in_stock: true,
       })
+      setFile(null)
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      setPreviewUrl(null)
 
       onSuccess()
     } catch (err) {
@@ -83,50 +125,25 @@ export function ProductForm({ sellerId, onSuccess }: ProductFormProps) {
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="name">Product Name*</Label>
-          <Input
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-            placeholder="Enter product name"
-          />
+          <Input id="name" name="name" value={formData.name} onChange={handleChange} required placeholder="Enter product name" />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="price">Price (USD)*</Label>
-          <Input
-            id="price"
-            name="price"
-            type="number"
-            step="0.01"
-            value={formData.price}
-            onChange={handleChange}
-            required
-            placeholder="0.00"
-          />
+          <Input id="price" name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} required placeholder="0.00" />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          name="description"
-          value={formData.description}
-          onChange={handleChange}
-          placeholder="Enter product description"
-          rows={3}
-        />
+        <Textarea id="description" name="description" value={formData.description} onChange={handleChange} placeholder="Enter product description" rows={3} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="category">Category</Label>
           <Select value={formData.category} onValueChange={handleCategoryChange}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="general">General</SelectItem>
               <SelectItem value="electronics">Electronics</SelectItem>
@@ -138,14 +155,15 @@ export function ProductForm({ sellerId, onSuccess }: ProductFormProps) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="image_url">Image URL</Label>
-          <Input
-            id="image_url"
-            name="image_url"
-            value={formData.image_url}
-            onChange={handleChange}
-            placeholder="https://example.com/image.jpg"
-          />
+          <Label htmlFor="image">Product Image</Label>
+          <Input id="image" type="file" accept="image/*" onChange={handleFileChange} />
+          {previewUrl && (
+            <img
+              src={previewUrl}
+              alt="Preview"
+              className="mt-2 h-28 w-28 rounded object-cover border"
+            />
+          )}
         </div>
       </div>
 
