@@ -4,7 +4,7 @@ import { ProductList } from "@/components/dashboard/product-list"
 import { StoreHeader } from "@/components/dashboard/store-header"
 
 export default async function DashboardPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login")
